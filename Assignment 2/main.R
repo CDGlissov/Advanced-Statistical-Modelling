@@ -57,87 +57,88 @@ plot(Model1GAM)
 # Possibly 2 order for Pres variable.
 
 # Initial model; 2 way interactions with Pres squared
-model <- lm(Ozone ~ .*.*I(Pres^2), data = ozone)
-summary(model)
+linearModel <- lm(Ozone ~ .*.*I(Pres^2), data = ozone)
+summary(linearModel)
 
-# Reducing model first using "step"
-model <- step(model, trace = 1)
+# Reducing linearModel first using "step"
+linearModel <- step(linearModel, trace = 1)
 
 # The rest manually
-drop1(model, test = "F")
-model <- update(model, .~. - InvHt:Hum:I(Pres^2))
+drop1(linearModel, test = "F")
+linearModel <- update(linearModel, .~. - InvHt:Hum:I(Pres^2))
 
-drop1(model, test = "F")
-model <- update(model, .~. - InvHt:Hum)
+drop1(linearModel, test = "F")
+linearModel <- update(linearModel, .~. - InvHt:Hum)
 
-drop1(model, test = "F")
-model <- update(model, .~. - Hgt:InvTmp:I(Pres^2))
+drop1(linearModel, test = "F")
+linearModel <- update(linearModel, .~. - Hgt:InvTmp:I(Pres^2))
 
-drop1(model, test = "F")
-model <- update(model, .~. - Hgt:InvTmp)
+drop1(linearModel, test = "F")
+linearModel <- update(linearModel, .~. - Hgt:InvTmp)
 
-drop1(model, test = "F")
-model <- update(model, .~. - InvHt:Hgt:I(Pres^2))
+drop1(linearModel, test = "F")
+linearModel <- update(linearModel, .~. - InvHt:Hgt:I(Pres^2))
 
-drop1(model, test = "F")
-model <- update(model, .~. - InvHt:Hgt)
+drop1(linearModel, test = "F")
+linearModel <- update(linearModel, .~. - InvHt:Hgt)
 
-drop1(model, test = "F")
-model <- update(model, .~. - Hgt:I(Pres^2))
+drop1(linearModel, test = "F")
+linearModel <- update(linearModel, .~. - Hgt:I(Pres^2))
 
-drop1(model, test = "F")
-model <- update(model, .~. - Hgt)
+drop1(linearModel, test = "F")
+linearModel <- update(linearModel, .~. - Hgt)
 
-drop1(model, test = "F")
-model <- update(model, .~. - Hum:InvTmp:I(Pres^2))
+drop1(linearModel, test = "F")
+linearModel <- update(linearModel, .~. - Hum:InvTmp:I(Pres^2))
 
-drop1(model, test = "F")
-model <- update(model, .~. - Temp:InvHt:I(Pres^2))
+drop1(linearModel, test = "F")
+linearModel <- update(linearModel, .~. - Temp:InvHt:I(Pres^2))
 
-drop1(model, test = "F")
-model <- update(model, .~. - InvHt:I(Pres^2))
+drop1(linearModel, test = "F")
+linearModel <- update(linearModel, .~. - InvHt:I(Pres^2))
 
-drop1(model, test = "F")
-model <- update(model, .~. - Temp:InvTmp:I(Pres^2))
+drop1(linearModel, test = "F")
+linearModel <- update(linearModel, .~. - Temp:InvTmp:I(Pres^2))
 
-drop1(model, test = "F")
-model <- update(model, .~. - Temp:InvHt)
+drop1(linearModel, test = "F")
+linearModel <- update(linearModel, .~. - Temp:InvHt)
 
-drop1(model, test = "F")
-model <- update(model, .~. - Temp:I(Pres^2))
+drop1(linearModel, test = "F")
+linearModel <- update(linearModel, .~. - Temp:I(Pres^2))
 
-drop1(model, test = "F")
-model <- update(model, .~. - Vis)
+drop1(linearModel, test = "F")
+linearModel <- update(linearModel, .~. - Vis)
 
-drop1(model, test = "F")
-model <- update(model, .~. - InvTmp:Wind:I(Pres^2))
+drop1(linearModel, test = "F")
+linearModel <- update(linearModel, .~. - InvTmp:Wind:I(Pres^2))
 
-drop1(model, test = "F")
-model <- update(model, .~. - InvTmp:Wind)
+drop1(linearModel, test = "F")
+linearModel <- update(linearModel, .~. - InvTmp:Wind)
 
-drop1(model, test = "F")
-model <- update(model, .~. - Wind:I(Pres^2))
+drop1(linearModel, test = "F")
+linearModel <- update(linearModel, .~. - Wind:I(Pres^2))
 
-drop1(model, test = "F")
-model <- update(model, .~. - Wind)
+drop1(linearModel, test = "F")
+linearModel <- update(linearModel, .~. - Wind)
 
-drop1(model, test = "F")
-model <- update(model, .~. - InvHt:Pres)
+drop1(linearModel, test = "F")
+linearModel <- update(linearModel, .~. - InvHt:Pres)
 
-drop1(model, test = "F")
-model <- update(model, .~. - InvTmp:I(Pres^2))
+drop1(linearModel, test = "F")
+linearModel <- update(linearModel, .~. - InvTmp:I(Pres^2))
 
-drop1(model, test = "F")
-model <- update(model, .~. - Hum:I(Pres^2))
+drop1(linearModel, test = "F")
+linearModel <- update(linearModel, .~. - Hum:I(Pres^2))
 
-drop1(model, test = "F")
-summary(model)
+drop1(linearModel, test = "F")
+summary(linearModel)
 
 par(mfrow = c(2,2))
-plot(model)
+plot(linearModel)
 # Aaaand what do you know? We need a transformation! Trying box-cox:
 par(mfrow=c(1,1))
-boxCox(model, lambda = seq(0,1,0.01))
+a = boxCox(linearModel, lambda = seq(0,1,0.01))
+a$x[a$y==max(a$y)]
 # Seems 1/3 would do the job i.e. the cubic-root transformation
 
 modelT <- lm(formula = I(Ozone^(1/3)) ~ Temp + InvHt + Pres + Hum + InvTmp + I(Pres^2) + 
@@ -150,7 +151,7 @@ summary(modelT)
 
 # Diagnostics plot again
 par(mfrow=c(2,2))
-plot(modelT)
+plot(modelT) 
 # ERROR - but residuals look better.
 
 
