@@ -11,7 +11,7 @@ library(gridExtra);
 library(repr);
 #Plots
 library(ggplot2, quietly = TRUE)
-library(ggpubr);
+library(ggpubr); 
 library(ggfortify);
 library(GGally);
 ggplot2::theme_set(ggplot2::theme_grey())
@@ -19,18 +19,19 @@ gg_color_hue <- function(n) {
   hues = seq(15, 375, length = n + 1)
   hcl(h = hues, l = 65, c = 100)[1:n]
 }
-#
-
+# Load path
 path="C:/Users/Christian/Dropbox/10. Semester/Dataanalyse og Statistisk Modellering/Assignments/Assignment 2"
 setwd(path)
+# Load sources
+source("reduce.R")
+# Load data
 dat_count = read.csv("dat_count.csv", header=TRUE, sep=";")
 data(ozone)
-
 dat_count[,c(1,2,3,5,6)] <- lapply(dat_count[,c(1,2,3,5,6)], factor)
-
 head(ozone)
 head(dat_count)
-# SUMMARY STATISTICS #######################################################################
+
+# SUMMARY STATISTICS 1.1 ###################################################################
 summary(ozone)
 summary(dat_count)
 
@@ -47,12 +48,62 @@ p=ggpairs(ozone,
           lower=list(continuous =wrap(plot_fun, pts=list(size=0.4, colour="black"), 
                      smt=list(method="loess", se=T, size=0.2, colour="red"))) )
 p
-# MODELLING ################################################################################
+# TASK 1.2-1.3 #############################################################################
+par(mfrow=c(3,3))
+# Possibly 2. order for Pres variable.
+gam(Ozone ~ s(Temp)+s(InvHt)+s(Pres)+s(Vis)+s(Hgt)+s(Hum)+s(InvTmp)+s(Wind),data=ozone)
+
+# Initial model; 2 way interactions with Pres squared
+LMInit <- lm(Ozone ~ .*.*I(Pres^2), data = ozone)
+
+#Reduce the model
+LM1=model.select(LMInit)
+summary(LM1)
+
+#Residuals
+autoplot(LM1, which=c(1:3,5), nrow=2,ncol=2)+theme(legend.position="none")
+
+# Trying box-cox:
+par(mfrow=c(1,1))
+l = boxCox(LM1, lambda = seq(0,1,0.01))
+l_opt=l$x[l$y==max(l$y)]
+# Seems 1/3 i.e the cubic-root transformation
+LM1_bc <- glm(Ozone^(l_opt) ~ Temp + InvHt + Pres + Hum + InvTmp + I(Pres^2) + 
+               Temp:InvTmp + Hum:InvTmp, family=gaussian, data = ozone)
+
+# Now Temp:InvTmp becomes insignificant
+drop1(LM1_bc, test = "F")
+LM1_bc <- update(LM1_bc, .~. - Temp:InvTmp)
+
+#Residuals have improved.
+summary(LM1_bc)
+autoplot(LM1_bc, which=c(1:3,5), nrow=2,ncol=2)+theme(legend.position="none")
+
+# GENERALIZED MODEL 1.4-1.5 ################################################################
+
+GLMGam_init <- glm(Ozone ~ .*.*I(Pres^2), family = Gamma(link="identity"), data = ozone)
+#inverse/log/identiy
+GLMGam=model.select(GLMGam_init)
+summary(GLMGam)
+autoplot(GLMGam, which=c(1:3,5), nrow=2,ncol=2)+theme(legend.position="none")
+
+InvGaus_init <- glm(Ozone ~ .*.*I(Pres^2), family = inverse.gaussian(link="inverse"), data = ozone)
+#1/mu^2, inverse, identity and log.
+InvGaus=model.select(InvGaus_init)
+summary(InvGaus)
+autoplot(InvGaus, which=c(1:3,5), nrow=2,ncol=2)+theme(legend.position="none")
 
 
 # QUESTIONS AND NOTES ######################################################################
 # Data is not in metric units. Should we convert units to metric, for inference?
+
 # Ozone is positive, not a many values are 0, inverse gaussian or gamma distribution?
+# https://cran.r-project.org/web/packages/GlmSimulatoR/vignettes/dealing_with_right_skewed_data.html
+
 # Should look into correlation between some of the variables.
+
+# if ggfortify or gpubr doesnt work, do remotes::update_packages("rlang")
+
+# Change from clara
 
 
