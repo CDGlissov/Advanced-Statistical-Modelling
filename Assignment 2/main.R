@@ -152,7 +152,7 @@ summary(modelT)
 # Diagnostics plot again
 par(mfrow=c(2,2))
 plot(modelT) 
-# ERROR - but residuals look better.
+# ERROR - but residuals look better
 
 
 
