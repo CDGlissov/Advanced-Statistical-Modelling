@@ -49,49 +49,69 @@ p=ggpairs(ozone,
                      smt=list(method="loess", se=T, size=0.2, colour="red"))) )
 p
 # TASK 1.2-1.3 #############################################################################
-par(mfrow=c(3,3))
-# Possibly 2. order for Pres variable.
-gam(Ozone ~ s(Temp)+s(InvHt)+s(Pres)+s(Vis)+s(Hgt)+s(Hum)+s(InvTmp)+s(Wind),data=ozone)
 
 # Initial model; 2 way interactions with Pres squared
-LMInit <- lm(Ozone ~ .*.*I(Pres^2), data = ozone)
+LMInit <- lm(Ozone ~ . , data = ozone)
+anova(LMInit)
 
 #Reduce the model
 LM1=model.select(LMInit)
 summary(LM1)
+# In the end only temperature, inversion base height, and humidity are significant
 
-#Residuals
+# Diagnostics
 autoplot(LM1, which=c(1:3,5), nrow=2,ncol=2)+theme(legend.position="none")
 
 # Trying box-cox:
 par(mfrow=c(1,1))
 l = boxCox(LM1, lambda = seq(0,1,0.01))
 l_opt=l$x[l$y==max(l$y)]
-# Seems 1/3 i.e the cubic-root transformation
-LM1_bc <- glm(Ozone^(l_opt) ~ Temp + InvHt + Pres + Hum + InvTmp + I(Pres^2) + 
-               Temp:InvTmp + Hum:InvTmp, family=gaussian, data = ozone)
+# Seems around 1/3 i.e the cubic-root transformation
+LM1_bc <- glm(Ozone^(l_opt) ~ Temp + InvHt + Hum, family=gaussian, data = ozone)
 
-# Now Temp:InvTmp becomes insignificant
+# Checking if everything is still significant
 drop1(LM1_bc, test = "F")
-LM1_bc <- update(LM1_bc, .~. - Temp:InvTmp)
 
-#Residuals have improved.
+# Residuals have improved.
 summary(LM1_bc)
 autoplot(LM1_bc, which=c(1:3,5), nrow=2,ncol=2)+theme(legend.position="none")
 
+
 # GENERALIZED MODEL 1.4-1.5 ################################################################
 
-GLMGam_init <- glm(Ozone ~ .*.*I(Pres^2), family = Gamma(link="identity"), data = ozone)
-#inverse/log/identiy
-GLMGam=model.select(GLMGam_init)
-summary(GLMGam)
-autoplot(GLMGam, which=c(1:3,5), nrow=2,ncol=2)+theme(legend.position="none")
+## Gamma family
+# Identity link function not working - trying log and inverse link functions
+# Trying the log link function
+GLMGam_init_log <- glm(Ozone ~ . , family = Gamma(link="log"), data = ozone)
+GLMGam_log=model.select(GLMGam_init_log)
+summary(GLMGam_log)
+autoplot(GLMGam_init_log, which=c(1:3,5), nrow=2,ncol=2)+theme(legend.position="none")
 
-InvGaus_init <- glm(Ozone ~ .*.*I(Pres^2), family = inverse.gaussian(link="inverse"), data = ozone)
-#1/mu^2, inverse, identity and log.
+# Trying the inverse link function
+GLMGam_init_inv <- glm(Ozone ~ . , family = Gamma(link="inverse"), data = ozone)
+GLMGam_inv=model.select(GLMGam_init_inv)
+summary(GLMGam_inv)
+autoplot(GLMGam_init_inv, which=c(1:3,5), nrow=2,ncol=2)+theme(legend.position="none")
+
+## Inverse gaussian family
+# Only the log link function seems to be working
+# 1/mu^2, inverse, identity and log.
+InvGaus_init <- glm(Ozone ~ ., family = inverse.gaussian("log"), data = ozone)
 InvGaus=model.select(InvGaus_init)
 summary(InvGaus)
 autoplot(InvGaus, which=c(1:3,5), nrow=2,ncol=2)+theme(legend.position="none")
+
+# COMPARING MODELS 1.5 #####################################################################
+
+# The classical linear model
+LM1_bcJacobian <- sum(log(BoxCoxData(ozone$Ozone,l_opt)$jacobian))
+AICRegModel(unclass(logLik(LM1_bc))[1],LM1_bcJacobian,5)
+
+# The generalized models
+AIC(GLMGam_init_log)
+AIC(GLMGam_init_inv)
+AIC(InvGaus)
+# Looks like we are going to use the classical glm.
 
 
 # QUESTIONS AND NOTES ######################################################################
@@ -106,4 +126,23 @@ autoplot(InvGaus, which=c(1:3,5), nrow=2,ncol=2)+theme(legend.position="none")
 
 
 
+par(mfrow=c(3,3))
+# Possibly 2. order for Pres variable.
+plot(gam(Ozone ~ s(Temp)+s(InvHt)+s(Pres)+s(Vis)+s(Hgt)+s(Hum)+s(InvTmp)+s(Wind),data=ozone))
 
+# Initial model; 2 way interactions with Pres squared
+LMInit <- lm(Ozone ~ .*.*I(Pres^2), data = ozone)
+
+# GENERALIZED MODEL 1.4-1.5 ################################################################
+
+GLMGam_init <- glm(Ozone ~ .*.*I(Pres^2), family = Gamma(link="identity"), data = ozone)
+#inverse/log/identiy
+GLMGam=model.select(GLMGam_init)
+summary(GLMGam)
+autoplot(GLMGam, which=c(1:3,5), nrow=2,ncol=2)+theme(legend.position="none")
+
+InvGaus_init <- glm(Ozone ~ .*.*I(Pres^2), family = inverse.gaussian(link="inverse"), data = ozone)
+#1/mu^2, inverse, identity and log.
+InvGaus=model.select(InvGaus_init)
+summary(InvGaus)
+autoplot(InvGaus, which=c(1:3,5), nrow=2,ncol=2)+theme(legend.position="none")

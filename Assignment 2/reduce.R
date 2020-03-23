@@ -6,7 +6,7 @@ has.interaction <- function(x,terms){
 }
 
 # Function Model.select
-# verbose=T gives the F-tests, dropped var and resulting model after 
+# verbose=T gives the F-tests, dropped var and resulting model after
 model.select <- function(model, keep, sig=0.05,verbose=F){
   counter=1
   # check input
@@ -82,4 +82,38 @@ model.select <- function(model, keep, sig=0.05,verbose=F){
     counter=counter+1
   } # end while(T) main loop
   return(model)
+}
+
+
+##### Functions for comparing models with partly transformed data #####
+
+# Computes the jacobian and other data related to the box-cox
+BoxCoxData<-function(x,lambda){
+  # Transforming the data
+  xlambda <- (x^lambda-1)/lambda
+  if (lambda==0){
+    xlambda = log(x)
+  }
+  n<-length(xlambda)
+  
+  # Finding Jacobian in each point 
+  Jacobian <- (x^(lambda-1))
+  # Finding optimal mu and sigma 
+  mu <- 1/n*sum(xlambda);
+  sigma2 <- 1/n*sum((xlambda-mu)^2)
+  
+  # Returning
+  returnList <- list(x = xlambda, jacobian = Jacobian, mu = mu, sigma2 = sigma2)
+  return(returnList)
+}
+
+# Calculating the AIC of the model given Jacobian
+AICRegModel<-function(loglik,Jacobian,n){
+  AIC <- 2*n - 2*loglik - 2*Jacobian
+  return(AIC)
+}
+# Calculating the loglikelihood given the Jacobian
+logLikJacobian<-function(loglik,Jacobian){
+  logLikJacobian<-loglik+Jacobian
+  return(logLikJacobian)
 }
