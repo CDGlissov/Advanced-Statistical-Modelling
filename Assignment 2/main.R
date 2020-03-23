@@ -94,6 +94,97 @@ summary(InvGaus)
 autoplot(InvGaus, which=c(1:3,5), nrow=2,ncol=2)+theme(legend.position="none")
 
 
+##### Clothing Insulation Level: Count data #####
+
+# Loading data
+clo_count <- read.csv("~/Library/Mobile Documents/com~apple~CloudDocs/DTU/10.semester/02424VideregåendeDataanalyseStatistiskModellering/Advanced-Statistical-Modelling/Assignment 2/dat_count.csv", sep=";")
+# clo is now the number of times a person changes clothes 
+
+#### 1: Develop a Generalized Model based on the Binomial Distribution #####
+## Model 1 ##
+# Ignoring subject ID and day
+model<-cbind(clo,nobs-clo)~time+sex+tOut+tInOp
+Binom.glm<-glm(model,family=binomial,
+               data=clo_count)
+
+# Reducing the model
+anova(Binom.glm,test="Chisq")
+
+# Remove tOut
+Binom.glm<-update(Binom.glm,~. -tOut)
+anova(Binom.glm,test="Chisq")
+
+# Removing tInOp
+Binom.glm<-update(Binom.glm,~. -tInOp)
+anova(Binom.glm,test="Chisq")
+
+# Removing time 
+Binom.glm<-update(Binom.glm,~. -time)
+anova(Binom.glm,test="Chisq")
+summary(Binom.glm)
+pval<-1- pchisq(172.57,134)
+pval
+# This p-value is to small
+
+# Checking the residuals 
+plot(Binom.glm)
+
+## Model 2: Including over dispersion ##
+Quasibinom.glm<-glm(model,family=quasibinomial,
+               data=clo_count)
+
+summary(Quasibinom.glm)
+
+anova(Quasibinom.glm,test="Chisq")
+
+# Remove tOut
+Quasibinom.glm<-update(Quasibinom.glm,~. -tOut)
+anova(Quasibinom.glm,test="Chisq")
+
+# Remove tInOp
+Quasibinom.glm<-update(Quasibinom.glm,~. -tInOp)
+anova(Quasibinom.glm,test="Chisq")
+
+# Remove time 
+Quasibinom.glm<-update(Quasibinom.glm,~. -time)
+anova(Quasibinom.glm,test="Chisq")
+
+plot(Quasibinom.glm)
+
+
+## Model 3: Using another link-function ##
+# Check which other link function might be appropriate
+anova(glm(model,family = binomial,data=clo_count))
+anova(glm(model,family=binomial(probit),data=clo_count))
+anova(glm(model,family=binomial(cauchit),data=clo_count))
+anova(glm(model,family=binomial(cloglog),data=clo_count))
+
+# Try the log-log (aloth)
+cloglog.glm<-glm(model,data=clo_count,
+                 family=binomial(cloglog))
+
+# Reduce the model
+anova(cloglog.glm,test="Chisq")
+
+# Remove tOut
+cloglog.glm<-update(cloglog.glm,~. -tOut)
+anova(cloglog.glm,test="Chisq")
+
+# Remove tInOp
+cloglog.glm<-update(cloglog.glm,~. -tInOp)
+anova(cloglog.glm,test="Chisq")
+
+# Remove time 
+cloglog.glm<-update(cloglog.glm,~. -time)
+anova(cloglog.glm,test="Chisq")
+
+# Checking for sufficiency
+summary(cloglog.glm)
+1- pchisq(172.57,134)
+# Exactly the same problem as before... 
+
+#### 2: Develop a generalized linear model with the Poisson model ####
+
 # QUESTIONS AND NOTES ######################################################################
 # Data is not in metric units. Should we convert units to metric, for inference?
 
@@ -104,6 +195,6 @@ autoplot(InvGaus, which=c(1:3,5), nrow=2,ncol=2)+theme(legend.position="none")
 
 # if ggfortify or gpubr doesnt work, do remotes::update_packages("rlang")
 
-# Change from clara
+
 
 
