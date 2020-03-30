@@ -108,12 +108,14 @@ LM1_bcJacobian <- sum(log(BoxCoxData(ozone$Ozone,l_opt)$jacobian))
 AICRegModel(unclass(logLik(LM1_bc))[1],LM1_bcJacobian,5)
 
 # The generalized models
-AIC(GLMGam_init_log)
-AIC(GLMGam_init_inv)
+AIC(GLMGam_log)
+AIC(GLMGam_inv)
 AIC(InvGaus)
 # Looks like we are going to use the classical glm.
 
-
+GLMGam_log$weights
+hej <- summary(GLMGam_log)
+hej$cov.unscaled
 # QUESTIONS AND NOTES ######################################################################
 # Data is not in metric units. Should we convert units to metric, for inference?
 
@@ -123,8 +125,9 @@ AIC(InvGaus)
 # Should look into correlation between some of the variables.
 
 # if ggfortify or gpubr doesnt work, do remotes::update_packages("rlang")
+X <- data.matrix(GLMGam_log$model)
 
-
+ solve(t(X) %*% X)
 
 par(mfrow=c(3,3))
 # Possibly 2. order for Pres variable.
