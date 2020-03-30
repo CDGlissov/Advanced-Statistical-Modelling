@@ -83,3 +83,16 @@ model.select <- function(model, keep, sig=0.05,verbose=F){
   } # end while(T) main loop
   return(model)
 }
+
+AIC_transformed <- function(model, lambda, y){
+  zn = c()
+  for(i in 1:length(y)){
+    if(l_opt != 0){
+      zn[i] = y[i]^(lambda)*y[i]^(-1)
+    }else{
+      zn[i] = y[i]^(-1)
+    }
+  }
+  
+  AIC(model)-2*sum(log(zn))
+}
