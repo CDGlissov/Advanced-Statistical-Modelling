@@ -174,7 +174,21 @@ ggarrange(plotlist=p_glm,ncol=1,nrow=4,labels=c("A","B","C","D"))
 
 
 
+# COMPARING MODELS 1.5 #####################################################################
 
+# The classical linear model
+LM1_bcJacobian <- sum(log(BoxCoxData(ozone$Ozone,l_opt)$jacobian))
+AICRegModel(unclass(logLik(LM1_bc))[1],LM1_bcJacobian,5)
+
+# The generalized models
+AIC(GLMGam_log)
+AIC(GLMGam_inv)
+AIC(InvGaus)
+# Looks like we are going to use the classical glm.
+
+GLMGam_log$weights
+hej <- summary(GLMGam_log)
+hej$cov.unscaled
 # QUESTIONS AND NOTES ######################################################################
 # Data is not in metric units. Should we convert units to metric, for inference?
 
@@ -184,6 +198,18 @@ ggarrange(plotlist=p_glm,ncol=1,nrow=4,labels=c("A","B","C","D"))
 # Should look into correlation between some of the variables.
 
 # if ggfortify or gpubr doesnt work, do remotes::update_packages("rlang")
+X <- data.matrix(GLMGam_log$model)
 
 # 
 
+GLMGam_init <- glm(Ozone ~ .*.*I(Pres^2), family = Gamma(link="identity"), data = ozone)
+#inverse/log/identiy
+GLMGam=model.select(GLMGam_init)
+summary(GLMGam)
+autoplot(GLMGam, which=c(1:3,5), nrow=2,ncol=2)+theme(legend.position="none")
+
+InvGaus_init <- glm(Ozone ~ .*.*I(Pres^2), family = inverse.gaussian(link="inverse"), data = ozone)
+#1/mu^2, inverse, identity and log.
+InvGaus=model.select(InvGaus_init)
+summary(InvGaus)
+autoplot(InvGaus, which=c(1:3,5), nrow=2,ncol=2)+theme(legend.position="none")
