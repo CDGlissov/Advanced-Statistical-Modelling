@@ -50,7 +50,13 @@ p
 
 qplot(ozone$Ozone,geom="histogram",binwidth = 1.9,xlab = "Ozone",col=I("black"),ylab = "Count",alpha=I(.4))
 
-
+# Autocorrelation plot
+autoCorr <- with(acf(ozone$Ozone, lag.max = 50, plot = F),data.frame(lag,acf))
+ggplot(autoCorr,aes(x=lag,y=acf)) + 
+  geom_hline(aes(yintercept = 0)) +
+  geom_segment(mapping = aes(xend = lag, yend = 0)) +
+  geom_hline(aes(yintercept = qnorm(0.975)/sqrt(length(ozone$Ozone))),lty = 2, col = 4, lwd = 0.7) +
+  labs(x = "Lag", y = "ACF", title = "Autocorrelation of Ozone measurements")
 
 # TASK 1.2-1.3 #############################################################################
 
@@ -76,6 +82,7 @@ ggplot(l,aes(x = x,y = y)) +
 gaus_bc <- glm((Ozone^(l_opt)-1)/l_opt ~ Temp+InvHt+Hum, family=gaussian, data = ozone)
 drop1(gaus_bc, test="Chisq")
 summary(gaus_bc)
+Anova(gaus_bc, type = 2)
 autoplot(gaus_bc, which=c(1:3,5), nrow=2,ncol=2)+ theme(legend.position="none")
 
 # GENERALIZED MODEL 1.4-1.5 ################################################################
@@ -148,13 +155,14 @@ par(mfrow=c(2,4))
 plot(pgam)
 par(mfrow=c(1,1))
 
-glm_init <- glm(Ozone ~ .*.*I(Pres^2)+, family=gaussian(link="identity"), data = ozone)
+glm_init <- glm(Ozone ~ .*.*.*I(Pres^2), family=gaussian(link="identity"), data = ozone)
+summary(glm_init)
 
 glm1 = model.select(glm_init)
 l = boxCox(glm1, lambda = seq(0,1,0.01))
 l_final=l$x[l$y==max(l$y)]
 
-glm1_bc = glm(Ozone^l_final ~ Temp + InvHt + Pres + Hum + InvTmp + I(Pres^2) + Temp:InvTmp + 
+glm1_bc = glm((Ozone^l_final-1)/l_final ~ Temp + InvHt + Pres + Hum + InvTmp + I(Pres^2) + Temp:InvTmp + 
                 Hum:InvTmp, family=gaussian(link="identity"), data = ozone)
 drop1(glm1_bc, test="F")
 glm1_bc = update(glm1_bc, ~.-Temp:InvTmp)
@@ -198,7 +206,6 @@ hej$cov.unscaled
 # Should look into correlation between some of the variables.
 
 # if ggfortify or gpubr doesnt work, do remotes::update_packages("rlang")
-X <- data.matrix(GLMGam_log$model)
 
 # 
 
