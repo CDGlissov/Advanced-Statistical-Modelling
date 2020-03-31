@@ -56,16 +56,27 @@ qplot(ozone$Ozone,geom="histogram",binwidth = 1.9,xlab = "Ozone",col=I("black"),
 
 LMInit <- lm(Ozone ~ ., data = ozone)
 LM1=model.select(LMInit)
+summary(LM1)
+autoplot(LM1, which=c(1:3,5), nrow=2, ncol=2) + theme(legend.position="none")
 
 # building simple models
 par(mfrow=c(1,1))
-l = boxCox(LM1, lambda = seq(0,1,0.01))
+l = data.frame(boxCox(LM1, lambda = seq(0,1,0.001)))
 l_opt=l$x[l$y==max(l$y)]
+ggplot(l,aes(x = x,y = y)) + 
+  geom_line() + 
+  geom_point(aes(x=l_opt,y=max(y)), col = 2) +
+  geom_line(aes(x = rep(l_opt,100),y=seq(max(y),-1460,length.out = 100)), lty = 2) +
+  geom_abline(slope = 0,intercept = max(l$y)-qchisq(.95,1)/2, lty = 2, col = 2) +
+  xlim(0,0.85) +
+  annotate("text", x=0.6,y=-1385,label = "95 %", col = 2) + 
+  labs(title = expression(paste("Profile log-likelihood of ",lambda)),x = expression(lambda),y="log-likelihood")
+
 # Seems 1/3 i.e the cubic-root transformation
-gaus_bc <- glm(Ozone^(l_opt) ~ Temp+InvHt+Hum, family=gaussian, data = ozone)
+gaus_bc <- glm((Ozone^(l_opt)-1)/l_opt ~ Temp+InvHt+Hum, family=gaussian, data = ozone)
 drop1(gaus_bc, test="Chisq")
 summary(gaus_bc)
-autoplot(gaus_bc, which=c(1:3,5), nrow=2,ncol=2)+theme(legend.position="none")
+autoplot(gaus_bc, which=c(1:3,5), nrow=2,ncol=2)+ theme(legend.position="none")
 
 # GENERALIZED MODEL 1.4-1.5 ################################################################
 
@@ -76,6 +87,7 @@ gam_inv=model.select(gam_inv_init)
 gam_log=model.select(gam_log_init)
 summary(gam_inv)
 summary(gam_log)
+anova(gam_log,test = "F")
 autoplot(gam_inv, which=c(1:3,5), nrow=2,ncol=2)+theme(legend.position="none")
 autoplot(gam_log, which=c(1:3,5), nrow=2,ncol=2)+theme(legend.position="none")
 
@@ -116,6 +128,7 @@ scaled_cov
 (summary(gaus_bc)$cov.scaled)
 
 #FOR GAMMA
+X <- cbind(rep(1,330),as.matrix(gam_log$model)[,c(2,3,4)])
 fitted_values=as.vector(exp(X %*% coef(gam_log)))
 y=ozone$Ozone
 deviance_residuals=sum(2*(y/fitted_values - log(y/fitted_values)-1))
