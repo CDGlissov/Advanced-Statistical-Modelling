@@ -75,7 +75,6 @@ ggplot(l,aes(x = x,y = y)) +
   labs(title = expression(paste("Profile log-likelihood of ",lambda)),x = expression(lambda),y="log-likelihood")
 
 # Seems 1/3 i.e the cubic-root transformation
-
 gaus_bc <- glm((Ozone^(l_opt)-1)/l_opt ~ Temp+InvHt+Hum, family=gaussian, data = ozone)
 drop1(gaus_bc, test="Chisq")
 summary(gaus_bc)
@@ -112,7 +111,6 @@ igaus_log_init <- glm(Ozone ~ ., family = inverse.gaussian(link="log"), data = o
 #test for fit
 1-pchisq(summary(igaus_inv_init)$deviance, summary(igaus_inv_init)$df.residual)
 1-pchisq(summary(igaus_log_init)$deviance, summary(igaus_log_init)$df.residual)
-
 
 igaus_inv=model.select(igaus_inv_init)
 anova(igaus_inv_init, test="F") #type 2/3 testing doesn't work? So use type 1
