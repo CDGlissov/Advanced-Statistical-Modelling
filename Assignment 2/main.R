@@ -58,11 +58,22 @@ ozone=ozone[ , !(names(ozone) %in% drops)]
 
 LMInit <- lm(Ozone ~ ., data = ozone)
 LM1=model.select(LMInit)
+summary(LM1)
+autoplot(LM1, which=c(1:3,5), nrow=2, ncol=2) + theme(legend.position="none")
 
 # building simple models
 par(mfrow=c(1,1))
-l = boxCox(LM1, lambda = seq(0,1,0.01))
+l = data.frame(boxCox(LM1, lambda = seq(0,1,0.001)))
 l_opt=l$x[l$y==max(l$y)]
+ggplot(l,aes(x = x,y = y)) + 
+  geom_line() + 
+  geom_point(aes(x=l_opt,y=max(y)), col = 2) +
+  geom_line(aes(x = rep(l_opt,100),y=seq(max(y),-1460,length.out = 100)), lty = 2) +
+  geom_abline(slope = 0,intercept = max(l$y)-qchisq(.95,1)/2, lty = 2, col = 2) +
+  xlim(0,0.85) +
+  annotate("text", x=0.6,y=-1385,label = "95 %", col = 2) + 
+  labs(title = expression(paste("Profile log-likelihood of ",lambda)),x = expression(lambda),y="log-likelihood")
+
 # Seems 1/3 i.e the cubic-root transformation
 
 gaus_bc <- glm((Ozone^(l_opt)-1)/l_opt ~ Temp+InvHt+Hum, family=gaussian, data = ozone)
@@ -90,6 +101,7 @@ gam_inv=model.select(gam_inv_init)
 gam_log=model.select(gam_log_init)
 summary(gam_inv)
 summary(gam_log)
+anova(gam_log,test = "F")
 autoplot(gam_inv, which=c(1:3,5), nrow=2,ncol=2)+theme(legend.position="none")
 autoplot(gam_log, which=c(1:3,5), nrow=2,ncol=2)+theme(legend.position="none")
 
@@ -244,7 +256,21 @@ g + geom_line(data=preddata3, aes(x= temp1, y = boxcox_inv(fit,l_opt)), colour="
 
 
 
+# COMPARING MODELS 1.5 #####################################################################
 
+# The classical linear model
+LM1_bcJacobian <- sum(log(BoxCoxData(ozone$Ozone,l_opt)$jacobian))
+AICRegModel(unclass(logLik(LM1_bc))[1],LM1_bcJacobian,5)
+
+# The generalized models
+AIC(GLMGam_log)
+AIC(GLMGam_inv)
+AIC(InvGaus)
+# Looks like we are going to use the classical glm.
+
+GLMGam_log$weights
+hej <- summary(GLMGam_log)
+hej$cov.unscaled
 # QUESTIONS AND NOTES ######################################################################
 # Data is not in metric units. Should we convert units to metric, for inference?
 

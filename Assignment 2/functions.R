@@ -6,7 +6,7 @@ has.interaction <- function(x,terms){
 }
 
 # Function Model.select
-# verbose=T gives the F-tests, dropped var and resulting model after 
+# verbose=T gives the F-tests, dropped var and resulting model after
 model.select <- function(model, keep, sig=0.05,verbose=F){
   counter=1
   # check input
