@@ -150,15 +150,31 @@ scaled_cov
 
 # Choosing the transformed gaussian as seen from the residuals a second order term seems relevant
 # Also looking at the GAM indicates higher order terms
-pgam=gam(Ozone ~ s(Temp)+s(InvHt)+s(Pres)+s(Vis)+s(Hgt)+s(Hum)+s(InvTmp)+s(Wind),data=ozone)
+pgam=gam((Ozone^l_opt-1)/l_opt ~ s(Temp)+s(InvHt)+s(Pres)+s(Vis)+s(Hgt)+s(Hum)+s(InvTmp)+s(Wind),data=ozone)
 par(mfrow=c(2,4))
 plot(pgam)
 par(mfrow=c(1,1))
 
-glm_init <- glm(Ozone ~ .*.*.*I(Pres^2), family=gaussian(link="identity"), data = ozone)
-summary(glm_init)
 
+glm_init <- glm((Ozone^l_opt-1)/l_opt ~  .*(+I(Vis^2)+I(Hum^2)+I(Temp^2)+I(Wind^2)+I(Pres^2)+I(InvHt^2)+I(Hgt^2)+I(InvTmp^2)), family=gaussian(link="identity"), data = ozone)
+length(glm_init$coefficients)
+glm_init2 <- glm((Ozone^l_opt-1)/l_opt ~ .*. + I(Pres^2), family=gaussian(link="identity"), data = ozone)
+
+anova(glm_init,glm_init2, test = "F")
 glm1 = model.select(glm_init)
+glm2 = model.select(glm_init2)
+summary(glm2)
+BIC(glm1)
+BIC(glm2)
+
+glm1 = update(glm1,.~. + Vis)
+plot(glm1)
+AIC_transformed(glm1,l_opt,ozone$Ozone)
+Anova(glm1, test = "F", type = 2)
+anova(glm2, test = "F")
+AIC(glm1)
+AIC(glm2)
+anova(glm1,glm2,test = "Chisq")
 l = boxCox(glm1, lambda = seq(0,1,0.01))
 l_final=l$x[l$y==max(l$y)]
 
