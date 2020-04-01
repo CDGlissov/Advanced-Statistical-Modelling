@@ -96,3 +96,28 @@ AIC_transformed <- function(model, lambda, y){
   
   AIC(model)-2*sum(log(zn))
 }
+
+BIC_transformed <- function(model, lambda, y){
+  zn = c()
+  for(i in 1:length(y)){
+    if(l_opt != 0){
+      zn[i] = y[i]^(lambda)*y[i]^(-1)
+    }else{
+      zn[i] = y[i]^(-1)
+    }
+  }
+  
+  BIC(model)-2*sum(log(zn))
+}
+
+boxcox_inv <- function(z,lambda){
+  yn = c()
+  for(i in 1:length(z)){
+    if(l_opt != 0){
+      yn[i] = exp(log(z[i]*lambda+1)/lambda)
+    }else{
+      yn[i]=exp(z[i])
+    }
+  }
+  return(yn)
+}
