@@ -27,9 +27,9 @@ source("functions.R")
 # Load data
 dat_count = read.csv("dat_count.csv", header=TRUE, sep=";")
 data(ozone)
-dat_count[,c(1,2,3,5,6)] <- lapply(dat_count[,c(1,2,3,5,6)], factor)
 head(ozone)
-head(dat_count)
+
+n=length(ozone$Ozone)
 
 # SUMMARY STATISTICS 1.1 ###################################################################
 #plot ozone
@@ -46,7 +46,7 @@ p=ggpairs(ozone,
           diag =list(continuous=wrap("densityDiag")),
           lower=list(continuous =wrap(plot_fun, pts=list(size=0.4, colour="black"), 
                      smt=list(method="loess", se=T, size=0.2, colour="red"))) )
-p
+#p
 
 qplot(ozone$Ozone,geom="histogram",binwidth = 1.9,xlab = "Ozone",col=I("black"),ylab = "Count",alpha=I(.4))
 
@@ -54,18 +54,40 @@ qplot(ozone$Ozone,geom="histogram",binwidth = 1.9,xlab = "Ozone",col=I("black"),
 drops <- c("InvTmp", "Hgt")
 ozone=ozone[ , !(names(ozone) %in% drops)]
 
+autoCorr <- with(acf(ozone$Ozone, lag.max = 50, plot = F),data.frame(lag,acf))
+ggplot(autoCorr,aes(x=lag,y=acf)) + 
+  geom_hline(aes(yintercept = 0)) +
+  geom_segment(mapping = aes(xend = lag, yend = 0)) +
+  geom_hline(aes(yintercept = qnorm(0.975)/sqrt(length(ozone$Ozone))),lty = 2, col = 4, lwd = 0.7) +
+  labs(x = "Lag", y = "ACF", title = "Autocorrelation of Ozone measurements")
+
+
 # TASK 1.2-1.3 #############################################################################
 
 LMInit <- lm(Ozone ~ ., data = ozone)
+Anova(LMInit, type = 2)
 LM1=model.select(LMInit)
 
 # building simple models
 par(mfrow=c(1,1))
-l = boxCox(LM1, lambda = seq(0,1,0.01))
+l = data.frame(boxCox(LM1, lambda = seq(0,1,0.001)))
 l_opt=l$x[l$y==max(l$y)]
-# Seems 1/3 i.e the cubic-root transformation
+# building simple models
+ggplot(l,aes(x = x,y = y)) + 
+  geom_line() + 
+  geom_point(aes(x=l_opt,y=max(y)), col = 2) +
+  geom_line(aes(x = rep(l_opt,100),y=seq(max(y),-1460,length.out = 100)), lty = 2) +
+  geom_abline(slope = 0,intercept = max(l$y)-qchisq(.95,1)/2, lty = 2, col = 2) +
+  xlim(0,0.85) +
+  annotate("text", x=0.6,y=-1385,label = "95 %", col = 2) + 
+  labs(title = expression(paste("Profile log-likelihood of ",lambda)),
+       x = expression(lambda),y="log-likelihood")
 
-gaus_bc <- glm((Ozone^(l_opt)-1)/l_opt ~ Temp+InvHt+Hum, family=gaussian, data = ozone)
+# Making a new data set with the transformed response
+ozoneT <- ozone
+ozoneT$Ozone <- (ozone$Ozone^(l_opt)-1)/l_opt
+
+gaus_bc <- glm(Ozone ~ Temp+InvHt+Hum, family=gaussian, data = ozoneT)
 drop1(gaus_bc, test="Chisq")
 summary(gaus_bc)
 autoplot(gaus_bc, which=c(1:3,5), nrow=2,ncol=2)+theme(legend.position="none")
@@ -101,14 +123,9 @@ igaus_log_init <- glm(Ozone ~ ., family = inverse.gaussian(link="log"), data = o
 1-pchisq(summary(igaus_inv_init)$deviance, summary(igaus_inv_init)$df.residual)
 1-pchisq(summary(igaus_log_init)$deviance, summary(igaus_log_init)$df.residual)
 
-
-igaus_inv=model.select(igaus_inv_init)
-anova(igaus_inv_init, test="F") #type 2/3 testing doesn't work? So use type 1
-igaus_inv=update(igaus_inv_init, ~.-InvTmp)
-anova(igaus_inv, test="F")
-igaus_inv=update(igaus_inv, ~.-Wind)
-anova(igaus_inv, test="F")
-igaus_inv=update(igaus_inv, ~.-Hgt)
+#type 2/3 testing doesn't work. So use type 1
+anova(igaus_inv_init, test="F") 
+igaus_inv=update(igaus_inv_init, ~.-Wind)
 anova(igaus_inv, test="F")
 
 igaus_log=model.select(igaus_log_init)
@@ -157,17 +174,35 @@ par(mfrow=c(2,4))
 plot(pgam)
 par(mfrow=c(1,1))
 
-degree2=paste0("I(",names(ozone)[2:7],"^2)",collapse=" + ")
-form=as.formula(paste0("(ozone$Ozone^(l_opt)-1)/l_opt ~ . * .+", degree2))
+degree2=paste0("I(",names(ozoneT)[2:7],"^2)",collapse=" + ")
+form=as.formula(paste0("Ozone ~ . * . +", degree2))
+# Estimating the lambda parameter again for the full model
 glm_init <- lm(form, data = ozone)
-model_final=model.select(glm_init)
+l <- data.frame(boxCox(glm_init, lambda = seq(0.07,0.5,0.001)))
+l_final <- l$x[l$y==max(l$y)]
+
+# Plotting the log-likelihood again
+ggplot(l,aes(x = x,y = y)) + 
+  geom_line() + 
+  geom_point(aes(x=l_final,y=max(y)), col = 2) +
+  geom_line(aes(x = rep(l_final,100),y=seq(max(y),-1338,length.out = 100)), lty = 2) +
+  geom_abline(slope = 0,intercept = max(l$y)-qchisq(.95,1)/2, lty = 2, col = 2) +
+  annotate("text", x=0.45,y=-1332.2,label = "95 %", col = 2) + 
+  labs(title = expression(paste("Profile log-likelihood of ",lambda)),x = expression(lambda),y="log-likelihood")
+
+ozoneT$Ozone <- (ozone$Ozone^l_final-1)/l_final
+glm_initBC <- lm(form, data = ozoneT)
+
+# The final model
+model_final=model.select(glm_initBC)
 model_final
+Anova(model_final,type = 2)
 BIC(model_final)
-AIC_transformed(model_final, l_opt, ozone$Ozone)
-BIC_transformed(model_final, l_opt, ozone$Ozone[2:n])
+AIC_transformed(model_final, l_final, ozone$Ozone)
+BIC_transformed(model_final, l_final, ozone$Ozone)
 par(mfrow=c(2,1))
-acf(model_final$residuals)
-pacf(model_final$residuals)
+acf(model_final$residuals, main = "ACF of residuals")
+pacf(model_final$residuals, main = "PACF of residuals")
 par(mfrow=c(1,1))
 autoplot(model_final, which=c(1:3,5), nrow=2,ncol=2)+theme(legend.position="none")
 
@@ -181,81 +216,129 @@ ggarrange(plotlist=p_glm,ncol=1,nrow=4,labels=c("A","B","C","D"))
 
 ###### MODEL WITH AR(1) ######
 n=length(ozone$Ozone)
-degree2=paste0("I(",names(ozone)[2:9],"^2)",collapse=" + ")
-form=as.formula(paste0("((ozone$Ozone^(l_opt)-1)/l_opt)[2:n] ~ ((ozone$Ozone^(l_opt)-1)/l_opt)[1:(n-1)]+. * .+", degree2))
-lag0=ozone[2:n,]
+lag0=ozoneT[2:n,]
+lag0$Ozone1 = ozoneT$Ozone[1:(n-1)]
+degree2=paste0("I(",names(ozone)[2:7],"^2)",collapse=" + ")
+form=as.formula(paste0("Ozone ~ Ozone1+. * .+", degree2))
 glm_lag_init = glm(form, family=gaussian(link="identity"), data = lag0)
 model_lag_final=model.select(glm_lag_init)
-BIC_transformed(model_lag_final, l_opt, ozone$Ozone[2:n])
-AIC_transformed(model_lag_final, l_opt, ozone$Ozone[2:n])
+BIC_transformed(model_lag_final, l_final, ozone$Ozone[2:n])
+AIC_transformed(model_lag_final, l_final, ozone$Ozone[2:n])
 par(mfrow=c(2,1))
-acf(model_lag_final$residuals)
-pacf(model_lag_final$residuals)
+acf2=acf(model_lag_final$residuals, plot=FALSE, lag.max=50)
+pacf2=pacf(model_lag_final$residuals, plot=FALSE, lag.max=50)
+plot(acf2, main="ACF of residuals")
+plot(pacf2, main="PACF of residuals")
 par(mfrow=c(1,1))
 autoplot(model_lag_final, which=c(1:3,5), nrow=2,ncol=2)+theme(legend.position="none")
 
 # PRED INTERVALS ###########################################################################
-glm_final=model_final
+glm_final = model_final
 n_new = 70
+colors = c("Fit" = "black","Confidence interval"="red","Prediction interval" = "blue")
 
+# WIND ##########
 wind = with(ozone,seq(min(Wind),max(Wind),length.out=n_new))
 newdat = with(ozone,data.frame(Temp = mean(Temp), InvHt = mean(InvHt), Pres = mean(Pres),
                                Vis = mean(Vis), Hum = mean(Hum), Wind = wind))
-preddata = predict(glm_final, newdata = newdat, interval = "p")
+preddataP = data.frame(predict(glm_final, newdata = newdat, interval = "p"))
+preddataC = predict(glm_final, newdata = newdat, interval = "c")
+
+ggplot(ozone, aes(x = Wind, y = Ozone)) + geom_point() +
+  geom_line(data=preddataP, aes(x=wind, y = boxcox_inv(lwr,l_final), colour = "Prediction interval"),lwd = 0.5, lty = 2) +
+  geom_line(data=preddataP, aes(x=wind, y = boxcox_inv(upr,l_final), colour = "Prediction interval"),lwd = 0.5, lty = 2) +
+  geom_ribbon(data=preddataC,aes(x=wind,ymin=boxcox_inv(lwr,l_final),
+                                 ymax=boxcox_inv(upr,l_final), fill = "Confidence interval"),lwd = 0.3,alpha = 0.5,inherit.aes=FALSE) +
+  geom_line(data=preddataP, aes(x=wind, y = boxcox_inv(fit,l_final),colour = "Fit"),lwd = 1, lty = 1) +
+  labs(title = "Predictions given Wind", fill = "Legend") +
+  scale_color_manual("",breaks = c("Fit","Prediction interval","Confidence interval"),values = colors)
 
 
-ggplot(ozone, aes(Wind, Ozone)) + geom_point() +
-  geom_line(data=preddata, aes(x=wind, y = boxcox_inv(fit,l_opt))) +
-  geom_line(data=preddata, aes(x=wind, y = boxcox_inv(lwr,l_opt)), colour="red") +
-  geom_line(data=preddata, aes(x=wind, y = boxcox_inv(upr,l_opt)), colour="red")
-
-temp1 = with(ozone,seq(min(Temp),max(Temp),length.out=n_new))
-newdat1 = data.frame(Temp = temp1, InvHt = mean(ozone$InvHt), Pres = mean(ozone$Pres),
+# TEMP ##########
+temp = with(ozone,seq(min(Temp),max(Temp),length.out=n_new))
+newdat1 = data.frame(Temp = temp, InvHt = mean(ozone$InvHt), Pres = mean(ozone$Pres),
                      Vis = mean(ozone$Vis), Hum = mean(ozone$Hum), Wind= mean(ozone$Wind))
-preddata1 = predict(glm_final, newdata = newdat1, interval = "p")
+preddata1P = predict(glm_final, newdata = newdat1, interval = "p")
+preddata1C = predict(glm_final, newdata = newdat1, interval = "c")
 
 ggplot(ozone, aes(Temp, Ozone)) + geom_point() +
-  geom_line(data=preddata1, aes(x=temp1, y = boxcox_inv(fit,l_opt))) +
-  geom_line(data=preddata1, aes(x=temp1, y = boxcox_inv(lwr,l_opt)), colour="red") +
-  geom_line(data=preddata1, aes(x=temp1, y = boxcox_inv(upr,l_opt)), colour="red")
-#########
+  geom_line(data=preddata1P, aes(x=temp, y = boxcox_inv(lwr,l_final), colour = "Prediction interval"),lwd = 0.5, lty = 2) +
+  geom_line(data=preddata1P, aes(x=temp, y = boxcox_inv(upr,l_final), colour = "Prediction interval"),lwd = 0.5, lty = 2) +
+  geom_ribbon(data=preddata1C,aes(x=temp,ymin=boxcox_inv(lwr,l_final),
+                                  ymax=boxcox_inv(upr,l_final), fill = "Confidence interval"),lwd = 0.3,alpha = 0.5,inherit.aes=FALSE) +
+  geom_line(data=preddata1P, aes(x=temp, y = boxcox_inv(fit,l_final),colour = "Fit"),lwd = 1, lty = 1) +
+  labs(title = "Predictions given Temperature", fill = "Legend") +
+  scale_color_manual("",breaks = c("Fit","Prediction interval","Confidence interval"),values = colors)
+
+# InvHt ##########
 invht= with(ozone,seq(min(InvHt),max(InvHt),length.out=n_new))
 newdat2 = data.frame(Temp = mean(ozone$Temp), InvHt = invht, 
                      Pres = mean(ozone$Pres),
                      Vis = mean(ozone$Vis), Hum = mean(ozone$Hum), 
                      Wind = mean(ozone$Wind))
-preddata2 = predict(glm_final, newdata = newdat2, interval = "p")
+preddata2P = predict(glm_final, newdata = newdat2, interval = "p")
+preddata2C = predict(glm_final, newdata = newdat2, interval = "c")
 
 ggplot(ozone, aes(InvHt, Ozone)) + geom_point() +
-  geom_line(data=preddata2, aes(x=invht, y = boxcox_inv(fit,l_opt))) +
-  geom_line(data=preddata2, aes(x=invht, y = boxcox_inv(lwr,l_opt)), colour="red") +
-  geom_line(data=preddata2, aes(x=invht, y = boxcox_inv(upr,l_opt)),colour="red")
-#########
-pres= with(ozone,seq(min(Pres),max(Pres),length.out=n_new))
-newdat3 = with(ozone,data.frame(Temp = temp1, InvHt = mean(InvHt), Pres =pres ,
+  geom_line(data=preddata2P, aes(x=invht, y = boxcox_inv(lwr,l_final), colour = "Prediction interval"),lwd = 0.5, lty = 2) +
+  geom_line(data=preddata2P, aes(x=invht, y = boxcox_inv(upr,l_final), colour = "Prediction interval"),lwd = 0.5, lty = 2) +
+  geom_ribbon(data=preddata2C,aes(x=invht,ymin=boxcox_inv(lwr,l_final),
+                                  ymax=boxcox_inv(upr,l_final), fill = "Confidence interval"),lwd = 0.3,alpha = 0.5,inherit.aes=FALSE) +
+  geom_line(data=preddata2P, aes(x=invht, y = boxcox_inv(fit,l_final),colour = "Fit"),lwd = 1, lty = 1) +
+  labs(title = "Predictions given Inversion Base Height", fill = "Legend") +
+  scale_color_manual("",breaks = c("Fit","Prediction interval","Confidence interval"),values = colors)
+
+# PRES ##########
+pres = with(ozone,seq(min(Pres),max(Pres),length.out=n_new))
+newdat3 = with(ozone,data.frame(Temp = mean(Temp), InvHt = mean(InvHt), Pres = pres ,
                                 Vis = mean(Vis), Hum = mean(Hum), Wind =mean(Wind)))
 
-preddata3 = predict(glm_final, newdata = newdat3, interval = "p")
+preddata3P = predict(glm_final, newdata = newdat3, interval = "p")
+preddata3C = predict(glm_final, newdata = newdat3, interval = "c")
 
-g = ggplot(ozone, aes(x = Temp, y=Ozone)) + geom_point()
-g + geom_line(data=preddata3, aes(x= temp1, y = boxcox_inv(fit,l_opt)), colour="black") +
-  geom_line(data=preddata3, aes(x= temp1, y = boxcox_inv(lwr,l_opt)),colour="red") +
-  geom_line(data=preddata3, aes(x= temp1, y = boxcox_inv(upr,l_opt)),colour="red")
+ggplot(ozone, aes(x = Pres, y=Ozone)) + geom_point() + 
+  geom_line(data=preddata3P, aes(x=pres, y = boxcox_inv(lwr,l_final), colour = "Prediction interval"),lwd = 0.5, lty = 2) +
+  geom_line(data=preddata3P, aes(x=pres, y = boxcox_inv(upr,l_final), colour = "Prediction interval"),lwd = 0.5, lty = 2) +
+  geom_ribbon(data=preddata3C,aes(x=pres,ymin=boxcox_inv(lwr,l_final),
+                                  ymax=boxcox_inv(upr,l_final), fill = "Confidence interval"),lwd = 0.3,alpha = 0.5,inherit.aes=FALSE) +
+  geom_line(data=preddata3P, aes(x=pres, y = boxcox_inv(fit,l_final),colour = "Fit"),lwd = 1, lty = 1) +
+  labs(title = "Predictions given Pressure", fill = "Legend") +
+  scale_color_manual("",breaks = c("Fit","Prediction interval","Confidence interval"),values = colors)
 
+# HUM ##########
+hum = with(ozone,seq(min(Hum),max(Hum),length.out=n_new))
+newdat4 = with(ozone,data.frame(Temp = mean(Temp), InvHt = mean(InvHt), Pres = mean(Pres) ,
+                                Vis = mean(Vis), Hum = hum, Wind =mean(Wind)))
 
+preddata4P = predict(glm_final, newdata = newdat4, interval = "p")
+preddata4C = predict(glm_final, newdata = newdat4, interval = "c")
 
+ggplot(ozone, aes(x = Hum, y=Ozone)) + geom_point() + 
+  geom_line(data=preddata4P, aes(x=hum, y = boxcox_inv(lwr,l_final), colour = "Prediction interval"),lwd = 0.5, lty = 2) +
+  geom_line(data=preddata4P, aes(x=hum, y = boxcox_inv(upr,l_final), colour = "Prediction interval"),lwd = 0.5, lty = 2) +
+  geom_ribbon(data=preddata4C,aes(x=hum,ymin=boxcox_inv(lwr,l_final),
+                                  ymax=boxcox_inv(upr,l_final), fill = "Confidence interval"),lwd = 0.3,alpha = 0.5,inherit.aes=FALSE) +
+  geom_line(data=preddata4P, aes(x=hum, y = boxcox_inv(fit,l_final),colour = "Fit"),lwd = 1, lty = 1) +
+  labs(title = "Predictions given Humidity", fill = "Legend") +
+  scale_color_manual("",breaks = c("Fit","Prediction interval","Confidence interval"),values = colors)
 
-# QUESTIONS AND NOTES ######################################################################
-# Data is not in metric units. Should we convert units to metric, for inference?
+# VIS ##########
+vis = with(ozone,seq(min(Vis),max(Vis),length.out=n_new))
+newdat5 = with(ozone,data.frame(Temp = mean(Temp), InvHt = mean(InvHt), Pres = mean(Pres) ,
+                                Vis = vis, Hum = mean(Hum), Wind =mean(Wind)))
 
-# Ozone is positive, not a many values are 0, inverse gaussian or gamma distribution?
-# https://cran.r-project.org/web/packages/GlmSimulatoR/vignettes/dealing_with_right_skewed_data.html
+preddata5P = predict(glm_final, newdata = newdat5, interval = "p")
+preddata5C = predict(glm_final, newdata = newdat5, interval = "c")
 
-# Should look into correlation between some of the variables.
+ggplot(ozone, aes(x = Vis, y=Ozone)) + geom_point() + 
+  geom_line(data=preddata5P, aes(x=vis, y = boxcox_inv(lwr,l_final), colour = "Prediction interval"),lwd = 0.5, lty = 2) +
+  geom_line(data=preddata5P, aes(x=vis, y = boxcox_inv(upr,l_final), colour = "Prediction interval"),lwd = 0.5, lty = 2) +
+  geom_ribbon(data=preddata5C,aes(x=vis,ymin=boxcox_inv(lwr,l_final),
+                                  ymax=boxcox_inv(upr,l_final), fill = "Confidence interval"),lwd = 0.3,alpha = 0.5,inherit.aes=FALSE) +
+  geom_line(data=preddata5P, aes(x=vis, y = boxcox_inv(fit,l_final),colour = "Fit"),lwd = 1, lty = 1) +
+  labs(title = "Predictions given Visibility", fill = "Legend") +
+  scale_color_manual("",breaks = c("Fit","Prediction interval","Confidence interval"),values = colors)
 
-# if ggfortify or gpubr doesnt work, do remotes::update_packages("rlang")
-
-# 
 
 
 
