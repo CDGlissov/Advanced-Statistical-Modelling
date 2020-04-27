@@ -30,7 +30,11 @@ data(ozone)
 dat_count[,c(1,2,3,5,6)] <- lapply(dat_count[,c(1,2,3,5,6)], factor)
 head(ozone)
 head(dat_count)
+<<<<<<< HEAD
 n = length(ozone$Ozone)
+=======
+n=length(ozone$Ozone)
+>>>>>>> tobias
 
 # SUMMARY STATISTICS 1.1 ###################################################################
 #plot ozone
@@ -202,6 +206,10 @@ ozoneT$Ozone <- (ozone$Ozone^l_final-1)/l_final
 glm_initBC <- lm(form, data = ozoneT)
 # The final model
 model_final=model.select(glm_initBC)
+<<<<<<< HEAD
+=======
+model_final
+>>>>>>> tobias
 Anova(model_final,type = 2)
 BIC(model_final)
 AIC_transformed(model_final, l_final, ozone$Ozone)
