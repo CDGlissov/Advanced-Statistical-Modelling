@@ -1,6 +1,28 @@
 rm(list=ls())
-library(nlme)
-setwd("~/Google Drev/UNI/Semester 10/Statmod 2/Projekt 3")
+#data
+library(gclus)
+#Tables
+library(xtable);
+#Statistics
+library(mgcv);
+library(car);
+library(grid);
+library(gridExtra);
+library(repr);
+library(nlme);
+library(glmmTMB)
+#Plots
+library(ggplot2, quietly = TRUE)
+library(ggpubr); 
+library(ggfortify);
+library(GGally);
+library(reshape2)
+ggplot2::theme_set(ggplot2::theme_grey())
+gg_color_hue <- function(n) {
+  hues = seq(15, 375, length = n + 1)
+  hcl(h = hues, l = 65, c = 100)[1:n]
+}
+setwd("~/Google Drev/UNI/Semester 10/Statmod 2/Advanced-Statistical-Modelling/Assignment 3")
 
 ###############################################################################################################################
 ##### PART 1 ##################################################################################################################
@@ -90,6 +112,7 @@ round(cov2cor(SigBlock),digits=TRUE)
 ###  PART 2  ############################################################################################################
 #########################################################################################################################
 
+# b #####################################################################################################################
 # Reading the data
 clo <- read.csv('dat_count3.csv', sep =';')
 clo$day <- as.factor(clo$day)
@@ -108,11 +131,11 @@ X[,6] = clo$tInOp
 
 # Joint probability
 nll <- function(u,beta,sigma.u,X){
-  # One u for every subject that are the same for each
+  # One u for every observation, i.e. will have more of the same
   U <- u[clo$subjId]
   eta <- X%*%beta
   -sum(dpois(clo$clo,lambda=exp(eta + log(U)),log=TRUE) +
-         dgamma(U, shape=sigma.u, scale=1/sigma.u,log=TRUE))
+         dgamma(U, shape=sigma.u, rate=sigma.u,log=TRUE))
 }
 
 # Laplacian log likehood
@@ -120,35 +143,37 @@ nll.LA <- function(theta,X){
   beta <- theta[1:dim(X)[2]]
   sigma.u <- exp(theta[dim(X)[2]+1])
   est <- nlminb(rep(1,47), objective = nll,
-                beta=beta, sigma.u=sigma.u,X=X,lower = rep(0.00001,47))
+                beta=beta, sigma.u=sigma.u,X=X, lower = rep(0,47),control = list(
+                  xf.tol = .Machine$double.eps))
   u <- est$par
   l.u <- est$objective
   H <- hessian(func = nll, x = u, beta = beta, sigma.u = sigma.u,
                X=X)
   l.u + 0.5 * log(det(H/(2*pi)))
 }
+
 # optimizing.. Takes 3-4 minutes
 system.time((fit1 <- nlminb(c(rep(0,6),1),nll.LA,X=X, control = list(trace = 5))))
 fit1
 # Getting the resulting random effects
-opt <- nlminb(rep(1,47),objective = nll, beta = fit1$par[1:6], sigma.u = fit1$par[7], X = X, lower = rep(0.00001,47))
+opt <- nlminb(rep(1,47),objective = nll, beta = fit1$par[1:6], sigma.u = fit1$par[7], X = X, lower = rep(0,47))
 
 #### Trying to optimize one dimension at a time, since u's are independent
-nll.LA3 <- function(theta,X){
+# Wont work for some reason.. Gives loglikelihood of -228
+nll.LA2 <- function(theta,X){
   beta <- theta[1:dim(X)[2]]
   sigma.u <- exp(theta[dim(X)[2]+1])
   fun.tmp <- function(ui,u,beta,sigma.u,X,i){
-    u <- rep(1,length(u))
-    u[i]<-ui
-    nll(u,beta,sigma.u,X)
+    ut <- exp(u*0)
+    ut[i]<-ui
+    nll(ut,beta,sigma.u,X)
   }
-  u <- rep(1,length(levels(clo$subjId)))
+  u <- numeric(47)
   ## Use grouping structure
   for(i in 1:length(u)){
     u[i] <- nlminb(1,objective = fun.tmp, u=u,beta=beta,
-                   sigma.u=sigma.u,X=X,i=i, lower = 0.00001)$par
+                   sigma.u=sigma.u,X=X,i=i, lower=0)$par
   }
-  # Finding the joint log-likelihood
   l.u <- nll(u,beta,sigma.u,X)
   H <- numeric(length(u))
   for(i in 1:length(u)){
@@ -157,17 +182,54 @@ nll.LA3 <- function(theta,X){
   l.u + 0.5 * log(prod(H/(2*pi)))
 }
 
-system.time(fit2 <- nlminb(c(rep(0,6),1),nll.LA3,X=X, control = list(trace = 5)))
+system.time((fit2 <- nlminb(c(rep(0,6),1),nll.LA2,X=X)))
 fit2
-nll.LA(fit1$par,X)
-nll.LA3(fit1$par,X)
-hessian(nll.LA, x = thet, X=X)
 
-xs <- seq(-2,2,0.001)
-ttt <- function(x) {
-  nll.LA3(c(x,0,0,0,0,0,15),X=X)
+# Checking the accuracy by importance sampling
+nll.LA4Rexsamp <- function(theta,X,k,seed){
+  set.seed(seed)
+  beta <- theta[1:dim(X)[2]]
+  sigma.u <- exp(theta[dim(X)[2]+1])
+  est <- nlminb(rep(1,47),objective = nll,
+                beta=beta, sigma.u=sigma.u,X=X, lower=rep(0,47))
+  u <- est$par
+  l.u <- est$objective
+  H <- diag(hessian(func = nll, x = u, beta = beta, sigma.u = sigma.u,
+                    X=X))
+  L <- numeric(k)
+  s <- sqrt(1/H)
+  for(i in 1:k){## Simulation part
+    u.sim <- rgamma(length(u), shape=sigma.u, scale=1/sigma.u)
+    L[i] <- exp(-nll(u.sim,beta,sigma.u,X))/
+      prod(dnorm(u.sim,mean=u,sd=s))
+  }
+  -log(mean(L))
 }
-y <- ttt(xs)
-plot(xs,y)
-length(xs)
-length(y)
+
+k <- 100000
+L <- nll.LA4Rexsamp(fit1$par,X,k=k,seed=16345)
+
+# Plotting the confidence
+n<-1000
+L.sim <- numeric(n)
+for(i in 1:n){
+  L.sim[i] <- exp(-nll.LA4Rexsamp(fit1$par,X,k=1,seed=i))
+  if (mod(i,10)==0) {
+    print(i)
+  }
+}
+
+## For plotting
+cs <- cumsum(L.sim)/(1:n)
+css <- cumsum(L.sim^2)/1:n
+csse <- css/(1:n)-(cs/1:n)^2
+
+
+#set y_lim for confidence intervals, but very small values
+y_lim = c(min(-log((cs+2*sqrt(csse))[-(1:2)])),max(-log((cs-2*sqrt(csse))[-(1:2)])))
+
+plot(log10(1:n),-log(cs),type="l", ylim = y_lim)# ylim=y_lim
+lines(log10(3:n),-log((cs+2*sqrt(csse))[-(1:2)]),type="l",col=2)#
+lines(log10(3:n),-log((cs-2*sqrt(csse))[-(1:2)]),type="l",col=2)#
+lines(log10(c(1,n)),fit1$objective*c(1,1),col=3)
+

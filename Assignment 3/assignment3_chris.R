@@ -176,7 +176,7 @@ fit.glm.bin2
 fit.glm.bin2=glmmTMB(cbind(clo,nobs-clo)~time+sex+tOut+tInOp+ar1(as.factor(day)-1|subjId), 
                      family=binomial(link = "logit"), data=clo)
 
-#tænk over offset(log(time))
+#t?nk over offset(log(time))
 fit.glm.pois<-glmmTMB(clo~time+nobs+sex+tOut+tInOp,family=poisson(link="log"),
                  data=clo)
 predict(fit.glm.pois)
@@ -205,7 +205,7 @@ nll.LA <- function(theta,X){
   beta <- theta[1:dim(X)[2]]
   sigma.u <- exp(theta[dim(X)[2]+1])
   est <- nlminb(exp(rep(0,47)), objective = nll,
-                beta=beta, sigma.u=sigma.u,X=X,lower =rep(0.0000001,47))
+                beta=beta, sigma.u=sigma.u,X=X,lower = rep(0.0000001,47))
   u <- est$par
   l.u <- est$objective
   H <- hessian(func = nll, x = u, beta = beta, sigma.u = sigma.u,
@@ -214,7 +214,7 @@ nll.LA <- function(theta,X){
 }
 
 system.time((fit1 <- nlminb(c(rep(0,6),1),nll.LA,X=X)))
-fit1
+fit1 
 
 nll.LA2 <- function(theta,X){
   beta <- theta[1:dim(X)[2]]
