@@ -1,6 +1,6 @@
 # Advanced-Statistical-Modelling
 Assignments and projects in:
 
-Course 02424 DTU <br>
-Course 02418 DTU <br>
+Advanced statistical modelling 02424 DTU <br>
+Statistical modelling and likelihood theory 02418 DTU <br>
 Applied statistics and statistical software
