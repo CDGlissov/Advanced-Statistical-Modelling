@@ -1,5 +1,5 @@
 # Advanced-Statistical-Modelling
-Assignments and projects in:
+Assignments and projects concerning:
 
 Advanced statistical modelling 02424 DTU <br>
 Statistical modelling and likelihood theory 02418 DTU <br>
